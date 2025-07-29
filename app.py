@@ -31,25 +31,49 @@ def download_video():
     if not data or 'url' not in data:
         return jsonify({'error': 'URL not provided'}), 400
     video_url = data['url']
+
     try:
-        logging.info(f"Fetching video info for {video_url}")
-        with YoutubeDL({'noplaylist': True, 'quiet': True}) as ydl:
-            info_dict = ydl.extract_info(video_url, download=False)
-            title = info_dict.get('title', 'video')
-            sanitized_title = sanitize_filename(title)
-            final_filename = f"{sanitized_title}.mp4"
-        logging.info(f"Final filename will be: {final_filename}")
         with tempfile.TemporaryDirectory() as temp_dir:
+            cookie_file_path = None
+            # ★★★ここからが追加部分★★★
+            try:
+                # GCSからクッキーファイルをダウンロードするパスを準備
+                cookie_file_path = os.path.join(temp_dir, 'cookies.txt')
+                storage_client = storage.Client()
+                bucket = storage_client.bucket(BUCKET_NAME)
+                blob = bucket.blob('cookies.txt') # GCSにアップロードしたファイル名
+                
+                logging.info(f"Downloading cookies.txt from GCS to {cookie_file_path}")
+                blob.download_to_filename(cookie_file_path)
+                logging.info("Cookies downloaded successfully.")
+                
+            except Exception as e:
+                # クッキーファイルがなくても処理は続行する
+                logging.warning(f"Could not download cookies.txt: {e}. Proceeding without cookies.")
+                cookie_file_path = None
+            # ★★★ここまでが追加部分★★★
+
+            logging.info(f"Fetching video info for {video_url}")
+            with YoutubeDL({'noplaylist': True, 'quiet': True, 'cookiefile': cookie_file_path}) as ydl:
+                info_dict = ydl.extract_info(video_url, download=False)
+                title = info_dict.get('title', 'video')
+                sanitized_title = sanitize_filename(title)
+                final_filename = f"{sanitized_title}.mp4"
+            logging.info(f"Final filename will be: {final_filename}")
+            
+            # yt-dlpのオプションにクッキーファイルを追加
             ydl_opts = {
                 'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
                 'outtmpl': os.path.join(temp_dir, final_filename),
                 'merge_output_format': 'mp4',
                 'noplaylist': True,
+                'cookiefile': cookie_file_path # ★この行を追加
             }
             logging.info(f"Starting download to {temp_dir}")
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([video_url])
             logging.info("Download finished.")
+
             local_filepath = os.path.join(temp_dir, final_filename)
             storage_client = storage.Client()
             bucket = storage_client.bucket(BUCKET_NAME)
@@ -57,6 +81,7 @@ def download_video():
             logging.info(f"Uploading {local_filepath} to gs://{BUCKET_NAME}/{final_filename}")
             blob.upload_from_filename(local_filepath)
             logging.info("Upload to GCS complete.")
+
             signed_url = blob.generate_signed_url(
                 version="v4",
                 expiration=timedelta(minutes=60),
