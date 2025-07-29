@@ -1,0 +1,4 @@
+Flask
+gunicorn
+yt-dlp
+google-cloud-storage
