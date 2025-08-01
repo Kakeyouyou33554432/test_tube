@@ -1,4 +1,3 @@
-Flask
-gunicorn
-yt-dlp
-google-cloud-storage
+discord.py==2.3.2
+Flask==3.0.0
+gunicorn==22.0.0
