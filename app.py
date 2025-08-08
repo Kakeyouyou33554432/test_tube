@@ -6,23 +6,21 @@ import threading
 import asyncio
 
 # -----------------------------------------------------------------------------
-# Flask (Webサーバー) の設定
+# Flask (Webサーバー)
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
 
 @app.route('/')
 def hello():
-    """Cloud Runが正常に起動しているか確認するためのルート"""
     return "Discord Bot is active now"
 
 # -----------------------------------------------------------------------------
-# Discordボットのコード
+# Discordボット
 # -----------------------------------------------------------------------------
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
-# ボットのデータや関数定義
 SHOT_TYPE = (
     (4, "紅霊夢A", "紅霊夢B", "紅魔理沙A", "紅魔理沙B"),
     (6, "妖霊夢A", "妖霊夢B", "妖魔理沙A", "妖魔理沙B", "妖咲夜A", "妖咲夜B"),
@@ -42,11 +40,11 @@ STICKER = (
     "<:nyny:1318960704249663498>", "<:plana2:1318964188537815150>", "<:usio:1318964272038019132>",
     "<:chiaki:1318964308628996106>",
 )
+
 def get_random_shot():
     game = random.choice(SHOT_TYPE)
     return random.choice(game[1:])
 
-# ボットのイベントハンドラ
 @client.event
 async def on_ready():
     print(f'Bot準備完了～ Logged in as {client.user}')
@@ -83,7 +81,7 @@ async def on_message(message):
         return
 
 # -----------------------------------------------------------------------------
-# FlaskアプリとDiscordボットを同時に起動させるための設定
+# Discordボットを別スレッドで起動
 # -----------------------------------------------------------------------------
 def run_bot():
     bot_token = os.environ.get("DISCORD_BOT_TOKEN")
@@ -94,7 +92,10 @@ def run_bot():
     asyncio.set_event_loop(loop)
     loop.run_until_complete(client.start(bot_token))
 
-# Gunicornがappをインポートした時点で、ボットをバックグラウンドで起動
 bot_thread = threading.Thread(target=run_bot)
 bot_thread.daemon = True
 bot_thread.start()
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
